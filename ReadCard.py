@@ -1,5 +1,7 @@
 import cv2
 import numpy as np
+import uuid
+import os
 
 
 class ReadCard:
@@ -39,7 +41,7 @@ class ReadCard:
     scale = 0.00392
     Width = 640
     Height = 352
-    conf_threshold = 0.5
+    conf_threshold = 0.8
 
     def card_to_name(self, c):
         return self.cardNames[c]
@@ -56,7 +58,7 @@ class ReadCard:
         blob = cv2.dnn.blobFromImage(image, self.scale, (self.Width, self.Height), (0, 0, 0), True, crop=True)
         net.setInput(blob)
         outs = net.forward(self.get_output_layers(net))
-        max_confidence = 0
+        max_confidence = self.conf_threshold
         card = None
         cards_found = 0
         for out in outs:
@@ -64,27 +66,39 @@ class ReadCard:
                 scores = detection[5:]
                 class_id = np.argmax(scores)
                 confidence = scores[class_id]
-                if confidence > self.conf_threshold and (card is None or (card is not None
-                                                                          and card == self.classes[class_id])):
+                if confidence >  self.conf_threshold:
                     cards_found = cards_found + 1
-                    card = self.classes[class_id]
                     if confidence > max_confidence:
+                        card = self.classes[class_id]
                         max_confidence = confidence
-        if cards_found < 2:
+        if cards_found < 1: # help to prevent a card from thin air
             card = None
             max_confidence = 0
         return card, max_confidence
+
+    def save_card(self, image, card):
+        fileName = '/f' + str(uuid.uuid1()) + '.jpg'
+        dir = 'D:/git/VectorCards/images/' + card
+        if not os.path.isdir(dir):
+            os.makedirs(dir)
+        image.save(dir + fileName)
 
     def extractCard(self, robot):
         weights = "yolov3-tiny_15000.weights"
         cfg = "yolov3-tiny-c104.cfg"
         net = cv2.dnn.readNet(weights, cfg)
 
+        same_image_count = 0
         while True:
             current_image_id = robot.camera.latest_image_id
             pil_image = robot.camera.latest_image
 
+            if current_image_id == self.image_id and same_image_count < 2:
+                self._robot.camera.init_camera_feed()
+
+            same_image_count = same_image_count + 1
             if current_image_id != self.image_id and pil_image is not None:
+                same_image_count = 0
                 pil_image = self._robot.camera.latest_image
                 self.image_id = self._robot.camera.latest_image_id
                 image_array = np.array(pil_image)
@@ -99,4 +113,5 @@ class ReadCard:
                 #     continue
                 # pil_image.save('out.jpg')
                 # cards.append(card)
+                self.save_card(pil_image, card)
                 return card, confidence
