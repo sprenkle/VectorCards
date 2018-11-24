@@ -76,14 +76,7 @@ class ReadCard:
             max_confidence = 0
         return card, max_confidence
 
-    def save_card(self, image, card):
-        fileName = '/f' + str(uuid.uuid1()) + '.jpg'
-        dir = 'D:/git/VectorCards/images/' + card
-        if not os.path.isdir(dir):
-            os.makedirs(dir)
-        image.save(dir + fileName)
-
-    def extractCard(self, robot):
+    def extract_card(self, robot):
         weights = "yolov3-tiny_15000.weights"
         cfg = "yolov3-tiny-c104.cfg"
         net = cv2.dnn.readNet(weights, cfg)
@@ -105,13 +98,4 @@ class ReadCard:
                 card, confidence = self.get_card(robot, net, image_array)
                 if card is None:
                     continue
-                # cards.append(card)
-                # if len(cards) < 2:
-                #     continue
-                # if len(cards) == 2 and cards[0] != cards[1]:
-                #     cards = []
-                #     continue
-                # pil_image.save('out.jpg')
-                # cards.append(card)
-                self.save_card(pil_image, card)
                 return card, confidence

@@ -10,7 +10,6 @@ with anki_vector.Robot(args.serial, enable_camera_feed=True, show_viewer=False) 
     cardRead = ReadCard(robot)
     robot.behavior.set_head_angle(degrees(0.0))
     while not done:
-        card, percentage = cardRead.extractCard(robot)
+        card, percentage = cardRead.extract_card(robot)
         print(card + " " + str(percentage))
         robot.say_text(cardRead.card_to_name(card))
-        time.sleep(2)

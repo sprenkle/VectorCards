@@ -1,132 +1,75 @@
-import anki_vector  # pylint: disable=wrong-import-position
-from anki_vector.util import parse_command_args, radians, degrees, distance_mm, speed_mmps, \
-    Vector3  # pylint: disable=wrong-import-position
-import time
+import anki_vector
+from anki_vector.util import parse_command_args, degrees
 
 
 class BlackJack(object):
-    def __init__(self, robot, blackJackActions, readCard):
-        """Initializer."""
-        self._blackJackActions = blackJackActions  # Engine is injected
+    def __init__(self, robot, blackJackActions, readCard, actions):
+        self._blackJackActions = blackJackActions
         self._cardRead = readCard
         self._robot = robot
+        self._actions = actions
 
-    def busted(self, count):
-        self.robot_say(str(count) + " Busted")
-
-    def blackjack(self, count):
-        self.robot_say(str(count) + " Blackjack")
-
-    def double(self, count):
-        self.robot_say(str(count) + " Double, one card more")
-
-    def split(self, card_num):
-        self.robot_say(str(card_num) + " Split")
-
-    def say_count(self, count):
-        self.robot_say(str(count))
-
-    def win(self):
-        self._robot.anim.play_animation("anim_blackjack_victorbjackwin_01")
-        self._robot.behavior.set_head_angle(degrees(5.0))
-        self.robot_say("I win")
-
-    def lose(self):
-
-        self._robot.anim.play_animation("anim_blackjack_victorlose_01")
-        self._robot.behavior.set_head_angle(degrees(5.0))
-        self.robot_say("I lose")
-
-    def tie(self):
-        self.robot_say("I tie")
-
-    def dealer_count(self, count):
-        self._robot.say_text("Dealer " + str(count))
-
-    def hit(self, count):
-        self._robot.say_text(str(count) + " Hit me")
-        SetLiftHeightResponse = self._robot.behavior.set_lift_height(.5, accel=50.0, max_speed=10.0, duration=0)
-        # time.sleep(.1)
-        SetLiftHeightResponse = self._robot.behavior.set_lift_height(0, accel=50.0, max_speed=10.0, duration=0)
-        # time.sleep(.1)
-        SetLiftHeightResponse = self._robot.behavior.set_lift_height(.5, accel=50.0, max_speed=10.0, duration=0)
-        # time.sleep(.1)
-        SetLiftHeightResponse = self._robot.behavior.set_lift_height(0, accel=50.0, max_speed=10.0, duration=0)
-
-    def stand(self, count):
-        self._robot.say_text(str(count) + " I Stand")
-        SetLiftHeightResponse = self._robot.behavior.set_lift_height(1, accel=50.0, max_speed=10.0, duration=0)
-        # time.sleep(.1)
-        SetLiftHeightResponse = self._robot.behavior.set_lift_height(0, accel=50.0, max_speed=10.0, duration=0)
-
-    def getNextCard(self, seenCards):
+    def get_next_card(self, seen_cards):
         card, percentage = self._cardRead.extractCard(self._robot)
-        while card in seenCards:
+        while card in seen_cards:
             card, percentage = self._cardRead.extractCard(self._robot)
-        seenCards.add(card)
+        seen_cards.add(card)
         return card
 
-    def robot_say(self, txt):
-        self._robot.say_text(txt)
-        # time.sleep(3)
-
-    def draw(self, d, v, index, results, seenCards):
-        done = False
-
-        while not done:
+    def draw(self, d, v, index, results, seen_cards):
+        while True:
             action = self._blackJackActions.player_action(d[0], v, index)
             count, ace = self._blackJackActions.get_count(v[index])
 
             if action == 'bu':
-                self.busted(count)
+                self._actions.busted(count)
                 results.append(count)
                 return results
 
             if action == 'st':
-                self.stand(count)
+                self._actions.stand(count)
                 results.append(count)
                 return results
 
             if action == 'dl':
-                self.double(count)
-                self.add_card(seenCards, v[index])
+                self._actions.double(count)
+                self.add_card(seen_cards, v[index])
                 count, ace = self._blackJackActions.get_count(v[index])
                 results.append(count)
-                self.say_count(count)
+                self._actions.say_count(count)
                 return results
 
             if action == 'bl':
-                self.blackjack(count)
+                self._actions.blackjack(count)
                 results.append(21.5)
                 return results
 
             if action == 'sp':
-                self.split(v[index][0])
+                self._actions.split(v[index][0])
 
                 second = v[index].pop()
-                splitHand = [second]
-                self.add_card(seenCards, splitHand)
-                v.append(splitHand)
-                self.draw(d, v, index + 1, results, seenCards)
+                split_hand = [second]
+                self.add_card(seen_cards, split_hand)
+                v.append(split_hand)
+                self.draw(d, v, index + 1, results, seen_cards)
 
             if action == 'ht':
-                self.hit(count)
+                self._actions.hit(count)
 
-            self.add_card(seenCards, v[index])
+            self.add_card(seen_cards, v[index])
 
-    def add_card(self, seenCards, cards):
-        card = self.getNextCard(seenCards)
+    def add_card(self, seen_cards, cards):
+        card = self.get_next_card(seen_cards)
         cards.append(card)
         print(card)
-        self.robot_say(self._cardRead.card_to_name(card))
+        self._actions.robot_say(self._cardRead.card_to_name(card))
 
     def run(self):
         self._robot.behavior.set_head_angle(degrees(5.0))
         deck_playable = True
         while deck_playable:
-            self.robot_say("Play a round")
+            self._actions.robot_say("Play a round")
             seen_cards = set([])
-            self._robot.camera.init_camera_feed()
             v = [[]]
             d = []
 
@@ -142,58 +85,60 @@ class BlackJack(object):
                 if end_results <= 21.5: all_busted = False
             if all_busted: continue
 
-            self.robot_say("Show Dealer Card")
+            self._actions.robot_say("Show Dealer Card")
 
             # Deal dealer 4th card
             self.add_card(seen_cards, d)
 
             d_count, ace = self._blackJackActions.get_count(d)
-            self.dealer_count(d_count)
+            self._actions.dealer_count(d_count)
 
             if len(d) == 2 and d_count == 21 and ace:
-                self.robot_say("Dealer Backjack")
-                self.lose()
+                self._actions.robot_say("Dealer Backjack")
+                self._actions.lose()
                 continue
 
             # if player blackjack check, note if a split and a bust dealer will still draw, should fix
             if len(results) == 1 and results[0] == 21.5:
-                self.win()
+                self._actions.win()
                 continue
 
             while (d_count < 17 and not ace) or (ace and d_count < 18):
-                self.robot_say("Dealer Draw")
-                card = self.getNextCard(seen_cards)
-                self.robot_say(self._cardRead.card_to_name(card))
+                self._actions.robot_say("Dealer Draw")
+                card = self.get_next_card(seen_cards)
+                self._actions.robot_say(self._cardRead.card_to_name(card))
                 d.append(card)
                 d_count, ace = self._blackJackActions.get_count(d)
-                self.dealer_count(d_count)
+                self._actions.dealer_count(d_count)
 
             d_count, ace = self._blackJackActions.get_count(d)
 
             if d_count <= 21:
-                self.robot_say("Dealer Stand")
+                self._actions.robot_say("Dealer Stand")
             else:
-                self.robot_say("Dealer Busted")
-                self.win()
+                self._actions.robot_say("Dealer Busted")
+                self._actions.win()
                 continue
 
             for values in results:
                 if values == d_count:
-                    self.tie()
+                    self._actions.tie()
                 elif values > d_count:
-                    self.win()
+                    self._actions.win()
                 else:
-                    self.lose()
+                    self._actions.lose()
 
 
 if __name__ == '__main__':
     from ReadCard import ReadCard
     from BlackJackActions import BlackJackActions
+    from RobotActions import RobotActions
 
     args = anki_vector.util.parse_command_args()
 
     with anki_vector.Robot(args.serial, enable_camera_feed=True, show_viewer=False) as robot:
         readCard = ReadCard(robot)
         blackJackActions = BlackJackActions()
-        blackJack = BlackJack(robot, blackJackActions, readCard)
+        actions = RobotActions(robot)
+        blackJack = BlackJack(robot, blackJackActions, readCard, actions)
         blackJack.run()
