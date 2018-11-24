@@ -1,10 +1,12 @@
 import cv2
 import numpy as np
 
+
 class ReadCard:
     def __init__(self, robot):
         """Initializer."""
         self._robot = robot
+        self._robot.camera.init_camera_feed()
 
     cardNames = {'Ah': "Ace of Hearts", 'Kh': "King of Hearts", 'Qh': "Queen of Hearts", 'Jh': "Jack of Hearts",
                  '10h': "Ten of Hearts", '9h': "Nine of Hearts",
@@ -62,7 +64,8 @@ class ReadCard:
                 scores = detection[5:]
                 class_id = np.argmax(scores)
                 confidence = scores[class_id]
-                if confidence > self.conf_threshold and (card is None or (card is not None and card == self.classes[class_id])):
+                if confidence > self.conf_threshold and (card is None or (card is not None
+                                                                          and card == self.classes[class_id])):
                     cards_found = cards_found + 1
                     card = self.classes[class_id]
                     if confidence > max_confidence:
@@ -73,25 +76,15 @@ class ReadCard:
         return card, max_confidence
 
     def extractCard(self, robot):
-        done = False
         weights = "yolov3-tiny_15000.weights"
         cfg = "yolov3-tiny-c104.cfg"
         net = cv2.dnn.readNet(weights, cfg)
 
-        same_image_count = 0
-        cards = []
-
-        while not (done):
+        while True:
             current_image_id = robot.camera.latest_image_id
             pil_image = robot.camera.latest_image
-            same_image_count = same_image_count + 1
 
-            # This is a hack,images just keep repeating not sure if it is something I coded or the Beta SDK, should be removed when fixed
-            if (current_image_id == self.image_id and same_image_count < 2):
-                self._robot.camera.init_camera_feed()
-
-            if (current_image_id != self.image_id and pil_image != None):
-                same_image_count = 0
+            if current_image_id != self.image_id and pil_image is not None:
                 pil_image = self._robot.camera.latest_image
                 self.image_id = self._robot.camera.latest_image_id
                 image_array = np.array(pil_image)
@@ -106,6 +99,4 @@ class ReadCard:
                 #     continue
                 # pil_image.save('out.jpg')
                 # cards.append(card)
-                if card[-1] == 'w':
-                    card = card[:-1]
                 return card, confidence
