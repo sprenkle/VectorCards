@@ -32,9 +32,9 @@ class BlackJack(object):
         self._actions = actions
 
     def get_next_card(self, seen_cards):
-        card, percentage = self._cardRead.extract_card(self._robot)
+        card, percentage = self._cardRead.extract_card()
         while card in seen_cards:
-            card, percentage = self._cardRead.extract_card(self._robot)
+            card, percentage = self._cardRead.extract_card()
         seen_cards.add(card)
         return card
 

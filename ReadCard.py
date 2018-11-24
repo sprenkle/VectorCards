@@ -29,6 +29,9 @@ class ReadCard:
         """Initializer."""
         self._robot = robot
         self._robot.camera.init_camera_feed()
+        weights = "yolov3-tiny_15000.weights"
+        cfg = "yolov3-tiny-c104.cfg"
+        self._net = cv2.dnn.readNet(weights, cfg)
 
     cardNames = {'Ah': "Ace of Hearts", 'Kh': "King of Hearts", 'Qh': "Queen of Hearts", 'Jh': "Jack of Hearts",
                  '10h': "Ten of Hearts", '9h': "Nine of Hearts",
@@ -73,11 +76,11 @@ class ReadCard:
         output_layers = [layer_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
         return output_layers
 
-    def get_card(self, robot, net, image_array):
+    def get_card(self, image_array):
         image = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
         blob = cv2.dnn.blobFromImage(image, self.scale, (self.Width, self.Height), (0, 0, 0), True, crop=True)
-        net.setInput(blob)
-        outs = net.forward(self.get_output_layers(net))
+        self._net.setInput(blob)
+        outs = self._net.forward(self.get_output_layers(self._net))
         max_confidence = self.conf_threshold
         card = None
         cards_found = 0
@@ -96,15 +99,11 @@ class ReadCard:
             max_confidence = 0
         return card, max_confidence
 
-    def extract_card(self, robot):
-        weights = "yolov3-tiny_15000.weights"
-        cfg = "yolov3-tiny-c104.cfg"
-        net = cv2.dnn.readNet(weights, cfg)
-
+    def extract_card(self):
         same_image_count = 0
         while True:
-            current_image_id = robot.camera.latest_image_id
-            pil_image = robot.camera.latest_image
+            current_image_id = self._robot.camera.latest_image_id
+            pil_image = self._robot.camera.latest_image
 
             if current_image_id == self.image_id and same_image_count < 2:
                 self._robot.camera.init_camera_feed()
@@ -115,7 +114,7 @@ class ReadCard:
                 pil_image = self._robot.camera.latest_image
                 self.image_id = self._robot.camera.latest_image_id
                 image_array = np.array(pil_image)
-                card, confidence = self.get_card(robot, net, image_array)
+                card, confidence = self.get_card(image_array)
                 if card is None:
                     continue
                 return card, confidence
